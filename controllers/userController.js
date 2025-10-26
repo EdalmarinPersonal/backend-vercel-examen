@@ -98,6 +98,8 @@ export const register = async (req, res) => {
 
 /*Login*/
 export const login = async (req, res) => {
+    console.log("Login iniciado para:", req.body.email);
+
     var userFound = await User.findOne({email: req.body.email});
     if (!userFound){
         return res.status(200);
@@ -108,8 +110,64 @@ export const login = async (req, res) => {
         return res.status(200).json({found: false});
     }
 
-    var token = jwt.sign({id: userFound._id , email: userFound.email},"skillnest", { expiresIn: "24h" });
-    return res.cookie("jwt", token, 
-        {httpOnly: true}).json({found: true});
-    //return res.status(200).json({found: true,jwt: token});
+    var token = jwt.sign({id: userFound._id , email: userFound.email},"skillnest", { expiresIn: "15m" });
+
+    console.log("Usuario encontrado:", userFound);
+
+    const response = {
+        found: true,
+        user: {
+            id: userFound._id,
+            name: userFound.firstName, // Verificar que userFound
+            email: userFound.email
+        }
+    };
+
+    console.log("Enviando respuesta:", response); //
+    
+    return res.cookie("jwt", token, {httpOnly: true}).json(response);
 }
+
+//obtener usuario actual
+export const getCurrentUserForo = async (req, res) => {
+    try {
+        const jwtToken = req.cookies.jwt;
+        
+        if (!jwtToken) {
+            return res.status(401).json({ message: "Token de sesión no encontrado" });
+        }
+
+        const tokenDecoded = jwt.verify(jwtToken, "skillnest");
+        const user = await User.findById(tokenDecoded.id).select('-password');
+        
+        if (!user) {
+            return res.status(404).json({ message: "Usuario no encontrado" });
+        }
+
+        return res.status(200).json({
+            id: user._id,
+            name: user.firstName,
+            email: user.email
+        });
+    } catch (error) {
+        return res.status(401).json({ message: "Token inválido" });
+    }
+};
+
+//logout foro
+export const logoutForo = async (req, res) => {
+    try {
+        
+        res.clearCookie('jwt', {
+            httpOnly: true
+        });
+        
+        return res.status(200).json({ 
+            message: "Sesión cerrada correctamente" 
+        });
+    } catch (error) {
+        return res.status(400).json({
+            message: error.message
+        });
+    }
+};
